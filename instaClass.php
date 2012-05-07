@@ -140,6 +140,11 @@ class instaClass {
             $image['thumb'] = $value->images->thumbnail->url;
             $image['full'] = $value->images->standard_resolution->url;
             $image['created'] = $value->created_time;
+            $image['caption'] = $value->caption->text;
+            $image['tags'] = $value->tags;
+            $image['latitude'] = $value->location->latitude;
+            $image['longitude'] = $value->location->longitude;
+            $image['id'] = $value->id;
             $images[] = $image;
         }
         return $images;
