@@ -1,5 +1,46 @@
 InstaClass is a simple PHP-class for communicating with the Instagram API.
 
-1. Create a client at api.instagram.com
+1. Create a client at http://instagr.am/developer/clients/register/
 2. initialize the class with your client id and client secret
-3. 
+<?php
+        require_once 'instaClass.php';
+        $clientId = 'YOUR_CLIENT_ID';
+        $clientSecret = 'YOUR_CLIENT_SECRET';
+        $config = array(
+            'redirectURI'   =>  'http://www.yourdomain.com/'
+        );
+        $instagram = new instaClass($clientId, $clientSecret, '', '', $config);
+        $SAVE_THIS_CODE = $instagram->authenticate();
+        print $instagram->getError();
+?>
+3. Take the authCode received from the part above, and request a token:
+<?php
+        require_once 'instaClass.php';
+        $clientId = 'YOUR_CLIENT_ID';
+        $clientSecret = 'YOUR_CLIENT_SECRET';
+        $authCode = 'AUTHCODE_RECEIVED_IN_STEP_2';
+        $config = array(
+            'redirectURI'   =>  'http://www.stilero.com/'
+        );
+        $instagram = new instaClass($clientId, $clientSecret, $authCode, '', $config);
+        $SAVE_THIS_TOKEN = $instagram->requestAccessToken();
+        print $instagram->getError();
+?>
+4. Proceed with the calls to the Instagram API
+<?php
+        require_once 'instaClass.php';
+        $clientId = 'YOUR_CLIENT_ID';
+        $clientSecret = 'YOUR_CLIENT_SECRET';
+        $authCode = 'YOUR_AUTHCODE_FROM_STEP_2';
+        $accessToken = 'TOKEN_FROM_STEP_3';
+        $config = array(
+            'redirectURI'   =>  'http://www.stilero.com/'
+        );
+        $instagram = new instaClass($clientId, $clientSecret, $authCode, $accessToken, $config);
+        //Get the 20 most recent images from authenticated user
+        $images = $instagram->recentUserImages();
+        foreach ($images as $image) {
+            print '<img src="'.$image['full'].'" />';
+        }
+        print $instagram->getError();
+?>
