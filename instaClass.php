@@ -6,7 +6,7 @@
  */
 
 /**
- * Description of instaClass
+ *  of instaClass
  *
  * @author Daniel Eliasson - joomla at stilero.com
  */
