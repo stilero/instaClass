@@ -1,0 +1,5 @@
+InstaClass is a simple PHP-class for communicating with the Instagram API.
+
+1. Create a client at api.instagram.com
+2. initialize the class with your client id and client secret
+3. 
