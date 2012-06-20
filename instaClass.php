@@ -2,7 +2,7 @@
 /**
 *  A simple PHP class for communicating with Instagram API
 *
-* @version  1.0
+* @version  1.1
 * @author Daniel Eliasson - www.stilero.com
 * @copyright  (C) 2012 Stilero Webdesign
 * @category library
@@ -53,9 +53,6 @@ class instaClass {
                 'subscriptionURL'       =>  'https://api.instagram.com/v1/subscriptions',
                 'instaBaseURL'          =>  'https://api.instagram.com/v1',
                 'redirectURI'           =>  '',
-                'fbOauthToken'          =>  '',
-                'fbPageID'              =>  '',
-                'authScope'             =>  '',
                 'authResponseType'      =>  'response_type=token',
                 'curlUserAgent'         =>  'instaClass - www.stilero.com',
                 'curlConnectTimeout'    =>  20,
@@ -82,7 +79,7 @@ class instaClass {
         return;
     }
     
-    private function authURL(){
+    public function authURL(){
         $authURL = $this->config['authURL'].
                 '?client_id=' . $this->clientId.
                 '&redirect_uri='.$this->config['redirectURI'].
@@ -90,89 +87,139 @@ class instaClass {
         return $authURL;
     }
     
-    public function requestAccessToken(){
+    public function requestAccessToken($authCode=''){
         $url = $this->config['accessTokenURL'];
         $postVars = array(
             'client_id'     =>  $this->clientId,
             'client_secret' =>  $this->clientSecret,
             'grant_type'    =>  'authorization_code',
             'redirect_uri'  =>  $this->config['redirectURI'],
-            'code'          =>  $this->authCode
+            'code'          =>  $authCode
         );
         return $this->doQuery($url, $postVars);
     }
     
-    public function listSubscriptions(){
-        $subUrl = $this->config['subscriptionURL'];
-        $postVars = array(
-            'client_secret'     => $this->clientSecret,
-            'client_id'         => $this->clientId
-        );
-        $url = $subUrl ."?". http_build_query($postVars);
-        return $this->doQuery($url, $postVars, FALSE, $this->HTTPHeader());
-    }
-    
-    public function userFeed($userID='self', $count=''){
-        $subURL = $this->config['instaBaseURL'].'/users/'.$userID.'/feed/';
-        $postVars = array(
-            'access_token'      => $this->accessToken,
-            'count'             =>  $count
-        );
-        print $url = $subURL ."?". http_build_query($postVars);
-        return $this->doQuery($url, $postVars, FALSE, $this->HTTPHeader());
-    }
-    
-    public function recentUserMedia($userID='self', $count='60'){
-        $subURL = $this->config['instaBaseURL'].'/users/'.$userID.'/media/recent/';
-        $postVars = array(
-            'access_token'      => $this->accessToken,
-            'count'             =>  $count
-        );
-        $url = $subURL ."?". http_build_query($postVars);
-        return $this->doQuery($url, $postVars, FALSE, $this->HTTPHeader());
-    }
-    
-    public function userMediaLiked($userID='self', $count=''){
-        $subURL = $this->config['instaBaseURL'].'/users/'.$userID.'/media/liked/';
-        $postVars = array(
-            'access_token'      => $this->accessToken,
-            'count'             =>  $count
-        );
-        $url = $subURL ."?". http_build_query($postVars);
-        return $this->doQuery($url, $postVars, FALSE, $this->HTTPHeader());
-    }
-    
-    public function recentUserImages($userID='self', $count=''){
-        $response = $this->recentUserMedia($userID='self', $count='');
-        $ResponseJSON = json_decode($response, TRUE);
-        $ResponseJSON = json_decode($response);
-        $data = $ResponseJSON->data;
-        $images = array();
-        foreach ($data as $value) {
-            $image['thumb'] = $value->images->thumbnail->url;
-            $image['full'] = $value->images->standard_resolution->url;
-            $image['created'] = $value->created_time;
-            $image['caption'] = $value->caption->text;
-            $image['tags'] = $value->tags;
-            $image['latitude'] = $value->location->latitude;
-            $image['longitude'] = $value->location->longitude;
-            $image['id'] = $value->id;
-            $images[] = $image;
+    public function fetchImages($userID='self', $count='30', $callType='', $callParams=''){
+        $path = '';
+        switch ($callType) {
+            case 'user-feed':
+                $path = '/users/'.$userID.'/feed/';
+                $postParams = array(
+                    'count' =>  $count
+                );
+                break;
+            case 'user-liked':
+                $path = '/users/'.$userID.'/media/liked/';               
+                 $postParams = array(
+                    'count' =>  $count
+                );
+                break;
+            case 'most-popular':
+                $path = '/media/popular';
+                $postParams = array(
+                    'count' =>  $count
+                );
+                break;
+            case 'user-info':
+                $path = '/users/'.$userID;
+                $postParams = array(
+                    'count' =>  $count
+                );
+                break;
+            case 'tags-search':
+                $path = '/tags/search';
+                $postParams = array(
+                    'q' =>  $callParams
+                );
+                break;
+            case 'tags-name':
+                $path = '/tags/'.$callParams.'/media/recent/';
+                break;
+            case 'media-search':
+                // Use array with 'longitude', 'latitude' and 'distance' as callParams
+                $path = '/media/search';
+                $postParams = array(
+                    'lng' =>  $callParams['longitude'],
+                    'lat' =>  $callParams['latitude'],
+                    'distance' =>  $callParams['distance'],
+                    'count' =>  $count
+                );
+                break;
+            default:
+                $path = '/users/'.$userID.'/media/recent/';
+                break;
         }
-        return $images;
+        $baseUrlAndPath = $this->config['instaBaseURL'].$path;
+        $postVars = array(
+            'access_token'      => $this->accessToken,
+        );
+        if(isset($postParams)){
+            $postVars = array_merge($postVars, $postParams);
+        }
+        $requestURI = $baseUrlAndPath ."?". http_build_query($postVars);
+        $jsonResponse = $this->doQuery($requestURI, $postVars, FALSE, $this->HTTPHeader());
+        return $this->jsonResponseToArray($jsonResponse);
     }
     
-    public function likedUserImages($userID='self', $count=''){
-        $response = $this->userMediaLiked($userID='self', $count='');
-        $ResponseJSON = json_decode($response, TRUE);
+    public function fetchUserInfoJSON($userID='self'){
+        $path = '/users/'.$userID;
+        $baseUrlAndPath = $this->config['instaBaseURL'].$path;
+        $postVars = array(
+            'access_token'      => $this->accessToken,
+            'count'             =>  $count
+        );
+        $requestURI = $baseUrlAndPath ."?". http_build_query($postVars);
+        return $jsonResponse = $this->doQuery($requestURI, $postVars, FALSE, $this->HTTPHeader());
+    }
+    
+    public function fetchUserInfoArray($userID='self'){
+        $userJSONResponse = $this->fetchUserInfoJSON($userID);
+        return $userInfoArray = $this->jsonResponseToUserArray($userJSONResponse);
+    }
+    
+    private function jsonResponseToUserArray($response){
+        $ResponseJSON = json_decode($response);
+        $data = $ResponseJSON->data;
+        //var_dump($data);exit;
+        $user=array();
+        if(isset($data)){
+            //foreach ($data as $value) {
+                $user['id'] = $data->id;
+                $user['username'] = $data->username;
+                $user['full_name'] = $data->full_name;
+                $user['profile_picture'] = $data->profile_picture;
+                $user['bio'] = $data->bio;
+                $user['website'] = $data->website;
+                $user['media'] = $data->counts->media;
+                $user['follows'] = $data->counts->follows;
+                $user['followed_by'] = $data->counts->followed_by;
+            //}
+        }
+        return $user;
+    }
+    
+    public function jsonResponseToArray($response){
         $ResponseJSON = json_decode($response);
         $data = $ResponseJSON->data;
         $images = array();
-        foreach ($data as $value) {
-            $image['thumb'] = $value->images->thumbnail->url;
-            $image['full'] = $value->images->standard_resolution->url;
-            $image['created'] = $value->created_time;
-            $images[] = $image;
+        if(isset($data)){
+            foreach ($data as $value) {
+                $image['thumb'] = $value->images->thumbnail->url;
+                $image['full'] = $value->images->standard_resolution->url;
+                $image['created'] = $value->created_time;
+                $image['caption'] = isset($value->caption->text) ? $value->caption->text : '';
+                $image['tags'] = $value->tags;
+                $image['latitude'] = isset($value->location->latitude) ? $value->location->latitude : '';
+                $image['longitude'] = isset($value->location->longitude) ? $value->location->longitude : '';
+                $image['id'] = $value->id;
+                $image['likes'] = $value->likes->count;
+                $image['comments'] = $value->comments->count;
+                $image['link'] = $value->link;
+                $image['user-name'] = $value->user->username;
+                $image['user-profilepic'] = $value->user->profile_picture;
+                $image['user-fullname'] = $value->user->full_name;
+                $images[] = $image;
+            }
         }
         return $images;
     }
@@ -189,7 +236,6 @@ class instaClass {
             CURLOPT_PROXY           =>  $this->config['curlProxy'],
             CURLOPT_ENCODING        =>  $this->config['curlEncoding'],
             CURLOPT_URL             =>  $url,
-            //CURLOPT_POST            =>  $post,
             CURLOPT_HEADER          =>  $this->config['curlHeader'],
             CURLINFO_HEADER_OUT     =>  $this->config['curlHeaderOut'],
         ));
@@ -217,6 +263,7 @@ class instaClass {
     }
     
     private function HTTPHeader(){
+        $header = array();
         $header[0] = "Accept: text/xml,application/xml,application/xhtml+xml,"; 
         $header[0] .= "text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5"; 
         $header[] = "Cache-Control: max-age=0"; 
