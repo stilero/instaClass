@@ -2,7 +2,7 @@
 /**
 *  A simple PHP class for communicating with Instagram API
 *
-* @version  1.1
+* @version  1.2
 * @author Daniel Eliasson - www.stilero.com
 * @copyright  (C) 2012 Stilero Webdesign
 * @category library
@@ -135,6 +135,9 @@ class instaClass {
             case 'tags-name':
                 $path = '/tags/'.$callParams.'/media/recent/';
                 break;
+            case 'next-page':
+                $path = $callParams;
+                break;
             case 'media-search':
                 // Use array with 'longitude', 'latitude' and 'distance' as callParams
                 $path = '/media/search';
@@ -150,6 +153,52 @@ class instaClass {
                 break;
         }
         $baseUrlAndPath = $this->config['instaBaseURL'].$path;
+        
+        $postVars = array(
+            'access_token'      => $this->accessToken,
+        );
+        if(isset($postParams)){
+            $postVars = array_merge($postVars, $postParams);
+        }
+        $requestURI = $baseUrlAndPath ."?". http_build_query($postVars);
+        
+        if($callType == 'next-page'){
+            $requestURI = $path;
+        }
+        $jsonResponse = $this->doQuery($requestURI, $postVars, FALSE, $this->HTTPHeader());
+        $images = $this->jsonResponseToArray($jsonResponse);
+        $nextPage = $images['nextpage'];
+        array_pop($images);
+        while (count($images) < $count && !empty($nextPage)){
+            $jsonResponse2 = $this->doQuery($nextPage, $postVars, FALSE, $this->HTTPHeader());
+            $images2 = $this->jsonResponseToArray($jsonResponse2);
+            $images = array_merge($images, $images2);
+            $nextPage = $images2['nextpage'];
+        }
+        return $images;
+        
+    }
+    
+    public function fetchInfo($userID='self', $callType='', $callParams=''){
+        $path = '';
+        switch ($callType) {
+            case 'users-search':
+                $path = '/users/search';
+                $postParams = array(
+                    'q' =>  $userID
+                );
+                break;
+            case 'user-followers':
+                $path = '/users/'.$userID.'/followed-by';
+                break;
+            case 'user-follows':
+                $path = '/users/'.$userID.'/follows';
+                break;
+            default:
+                $path = '/users/'.$userID.'/media/recent/';
+                break;
+        }
+        $baseUrlAndPath = $this->config['instaBaseURL'].$path;
         $postVars = array(
             'access_token'      => $this->accessToken,
         );
@@ -158,7 +207,8 @@ class instaClass {
         }
         $requestURI = $baseUrlAndPath ."?". http_build_query($postVars);
         $jsonResponse = $this->doQuery($requestURI, $postVars, FALSE, $this->HTTPHeader());
-        return $this->jsonResponseToArray($jsonResponse);
+        $decodedJSON = json_decode($jsonResponse);
+        return $decodedJSON;
     }
     
     public function fetchUserInfoJSON($userID='self'){
@@ -180,10 +230,8 @@ class instaClass {
     private function jsonResponseToUserArray($response){
         $ResponseJSON = json_decode($response);
         $data = $ResponseJSON->data;
-        //var_dump($data);exit;
         $user=array();
         if(isset($data)){
-            //foreach ($data as $value) {
                 $user['id'] = $data->id;
                 $user['username'] = $data->username;
                 $user['full_name'] = $data->full_name;
@@ -221,6 +269,7 @@ class instaClass {
                 $images[] = $image;
             }
         }
+        $images['nextpage'] = $ResponseJSON->pagination->next_url;
         return $images;
     }
     
